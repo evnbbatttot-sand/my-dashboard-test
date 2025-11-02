@@ -472,6 +472,26 @@
                 if (container) await fetchCryptoData(container);
              }
         })();
+        
+        
+        // --- 6. 新規: ページ全体の自動リロード設定 ---
+        const RELOAD_INTERVAL_SECONDS = 600; // ★推奨: 10分 (600秒)
+        
+        function setupAutoReload() {
+            // setTimeoutではなくsetIntervalを使うことで、定期的にリロードを繰り返します
+            setInterval(() => {
+                console.log(`[Auto Reload] ${RELOAD_INTERVAL_SECONDS}秒が経過したため、ページをリロードします。`);
+                window.location.reload();
+            }, RELOAD_INTERVAL_SECONDS * 1000); 
+        }
+
+        // すべてのデータを順次取得開始
+        (async () => {
+             // ... (省略) ... 既存のデータ取得処理 ...
+             
+             // データ取得完了後、自動リロードを開始
+             setupAutoReload();
+        })();
     </script>
 </body>
 </html>
