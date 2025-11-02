@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終版）</title>
+    <title>情報ダッシュボード（完成版）</title>
     <style>
-        /* (CSSは変更なし) */
+        /* CSSスタイルは変更なし */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -53,14 +53,17 @@
         /* 交通情報用のスタイル */
         .traffic-widget-container {
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 200px; /* 高さを調整 */
+            height: 200px;
             text-align: center;
+            padding-top: 20px;
         }
         .traffic-widget-container img {
             max-width: 90%;
             height: auto;
+            border: 1px solid #444; /* 画像が目立つように枠を追加 */
         }
     </style>
 </head>
@@ -75,7 +78,7 @@
         <h2>🌤️ 天気予報（東京/台東）</h2>
         <div class="widget-container">
             <iframe 
-                src="https://sitecreation.co.jp/tenkiyohou/?postal=1100005&days=3&color=w" 
+                src="https://sitecreation.co.jp/cgi-bin/hariten/hariten.cgi?postal=1100005&days=3&width=100%&height=300" 
                 width="100%" 
                 height="300" 
                 frameborder="0" 
@@ -89,16 +92,24 @@
     <div class="info-panel" style="flex-basis: 45%;">
         <h2>🚃 運行状況（JR山手線）</h2>
         <div class="traffic-widget-container">
-            <a href="https://traininfo.jr-central.co.jp/zairaisen/status_details_01.html" target="_blank" title="JR山手線の運行情報">
-                <img src="https://traininfo.jr-central.co.jp/traffic_img/zairaisen/01_status_m.png" alt="JR山手線の運行状況">
-                <p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">（画像が古い場合はリンク先で確認）</p>
+            <a href="https://ekitan.com/status/" target="_blank" title="駅探 運行情報">
+                <img src="https://static.ekitan.com/status/img/yamanote.gif" alt="JR山手線の運行状況">
+                <p style="font-size: 0.9em; color: #aaa; margin-top: 10px;">
+                    画像をクリックで詳細情報へ
+                </p>
             </a>
         </div>
     </div>
     
     <div class="info-panel" style="flex-basis: 100%;">
         <h2>📰 ニュースヘッドライン</h2>
-        <p style="color: #ccc;">（ここに、RSSリーダーや他のウィジェットを埋め込みます）</p>
+        <div class="widget-container" style="height: 150px;">
+            <p style="color: #ccc;">
+                （埋め込み制限に引っかかる可能性が高いため、現在はダミーです。）
+                <br>
+                最も確実なのは、Fire TV Stickで「ニュースアプリ」を別途用意し、Alexaで起動することです。
+            </p>
+        </div>
     </div>
 
     <script>
