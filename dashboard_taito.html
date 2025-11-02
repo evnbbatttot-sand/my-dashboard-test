@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（Open-Meteo版）</title>
+    <title>情報ダッシュボード（最終版）</title>
     <style>
-        /* (CSSスタイルは省略しますが、以前のコードと同じです) */
+        /* (以前のCSSスタイルと同じです。省略) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -40,21 +40,23 @@
             min-width: 300px;
         }
         /* Open-Meteoの表示エリア */
-        #weather-data {
+        #weather-data, #stock-data {
             height: 250px;
             overflow-y: auto;
             line-height: 1.6;
             padding-top: 10px;
         }
-        .weather-day {
+        .weather-day, .stock-item {
             margin-bottom: 10px;
             border-bottom: 1px solid #333;
             padding-bottom: 5px;
         }
-        .weather-day strong {
-            color: #ffcc00; /* 翌日以降の強調 */
+        .stock-value {
+            font-size: 1.5em;
+            font-weight: bold;
         }
-        /* 交通情報リンクの調整 */
+        .change-positive { color: #4CAF50; } /* 緑 */
+        .change-negative { color: #F44336; } /* 赤 */
         .traffic-link-container {
             display: flex;
             align-items: center;
@@ -79,11 +81,19 @@
     <div class="info-panel" style="flex-basis: 45%;">
         <h2>🌤️ 天気予報（台東区）</h2>
         <div id="weather-data">
-            データを読み込み中です...
+            天気データを読み込み中です...
         </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
+        <h2>📈 株価情報（日経平均）</h2>
+        <div id="stock-data">
+            株価データを読み込み中です...<br>
+            ※ご利用にはAPIキーの設定が必要です。
+        </div>
+    </div>
+
+    <div class="info-panel" style="flex-basis: 100%;">
         <h2>🚃 運行状況（JR山手線）</h2>
         <div class="traffic-link-container">
             <a href="https://transit.yahoo.co.jp/diainfo/65" target="_blank" title="JR山手線の運行情報">
@@ -92,15 +102,8 @@
         </div>
     </div>
 
-    <div class="info-panel" style="flex-basis: 100%;">
-        <h2>📰 ニュース・株価情報</h2>
-        <p style="color: #ccc;">
-            （埋め込み制限が厳しいため、Fire TV Stickでニュースアプリをご利用ください。）
-        </p>
-    </div>
-
     <script>
-        // 時刻と日付をリアルタイムで更新するスクリプト (変更なし)
+        // *** 1. 時刻と日付のスクリプト (変更なし) ***
         function updateTime() {
             const now = new Date();
             const clock = document.getElementById('clock');
@@ -113,62 +116,96 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // Open-Meteoから天気データを取得し表示するスクリプト
+        // *** 2. 天気予報のスクリプト (変更なし) ***
         async function fetchWeatherData() {
             // 台東区（東京駅付近）の緯度経度
             const latitude = 35.6895;
             const longitude = 139.6917;
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
 
+            const weatherCodes = {
+                0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️', 45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️',
+            };
+            
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 const container = document.getElementById('weather-data');
-                container.innerHTML = ''; // コンテンツをクリア
-
+                container.innerHTML = '';
+                
                 if (data.daily && data.daily.time) {
-                    const daysToShow = 3;
                     let htmlContent = '';
-                    const weatherCodes = {
-                        0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️',
-                        45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️',
-                        // その他、必要に応じてコードとアイコンを追加してください
-                    };
-                    
-                    for (let i = 0; i < daysToShow && i < data.daily.time.length; i++) {
+                    for (let i = 0; i < 3 && i < data.daily.time.length; i++) {
                         const dateStr = data.daily.time[i];
                         const date = new Date(dateStr);
                         const dayOfWeek = date.toLocaleDateString('ja-JP', { weekday: 'short' });
                         const maxTemp = data.daily.temperature_2m_max[i];
                         const minTemp = data.daily.temperature_2m_min[i];
                         const weather = weatherCodes[data.daily.weather_code[i]] || '不明';
-
                         const dayLabel = i === 0 ? '【今日】' : `明日 (${dayOfWeek})`;
                         
-                        htmlContent += `
-                            <div class="weather-day">
-                                <strong>${dayLabel}:</strong> ${weather}
-                                <br>
-                                ${minTemp}°C / ${maxTemp}°C (最低/最高)
-                            </div>
-                        `;
+                        htmlContent += `<div class="weather-day"><strong>${dayLabel}:</strong> ${weather}<br>${minTemp}°C / ${maxTemp}°C (最低/最高)</div>`;
                     }
                     container.innerHTML = htmlContent;
-
                 } else {
                     container.textContent = '天気データを取得できませんでした。';
                 }
 
             } catch (error) {
-                console.error('天気データ取得エラー:', error);
                 document.getElementById('weather-data').textContent = '天気データ取得中にエラーが発生しました。';
             }
         }
-
-        // ページ読み込み時にデータを取得
         fetchWeatherData();
-        // 30分ごとに更新（必要に応じて）
-        // setInterval(fetchWeatherData, 30 * 60 * 1000); 
+
+        // *** 3. 株価情報のスクリプト (Alpha Vantage API) ***
+        async function fetchStockData() {
+            // !!! ここに取得したAPIキーを設定してください !!!
+            const API_KEY = 'YOUR_API_KEY'; 
+            
+            // 日経平均株価 (NKY) - 指数情報を取得するAPI
+            // ※「^N225」や「9984.T」などのティッカーシンボルは無料APIでは制限されるため、ここでは代表的な指数 NKY を試します。
+            const symbol = 'NKY'; 
+            const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+            const container = document.getElementById('stock-data');
+
+            if (API_KEY === 'AQW7306BT8O0CGNY') {
+                container.innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
+                return;
+            }
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data['Global Quote']) {
+                    const quote = data['Global Quote'];
+                    const price = parseFloat(quote['05. price']).toFixed(2);
+                    const change = parseFloat(quote['09. change']).toFixed(2);
+                    const changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
+
+                    const changeClass = change >= 0 ? 'change-positive' : 'change-negative';
+                    const sign = change >= 0 ? '+' : '';
+
+                    container.innerHTML = `
+                        <div class="stock-item">
+                            <div class="stock-value">${price}</div>
+                            <div class="${changeClass}">
+                                ${sign}${change} (${sign}${changePercent}%)
+                            </div>
+                            <p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
+                                ※データは遅延または市場営業時間外のものです。
+                            </p>
+                        </div>
+                    `;
+                } else {
+                    container.textContent = '株価データを取得できませんでした。APIキーやシンボルを確認してください。';
+                }
+
+            } catch (error) {
+                container.textContent = '株価データ取得中にエラーが発生しました。';
+            }
+        }
+        fetchStockData();
     </script>
 </body>
 </html>
