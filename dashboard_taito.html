@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終版）</title>
+    <title>情報ダッシュボード（最終調整版）</title>
     <style>
-        /* (以前のCSSスタイルと同じです。省略) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -39,24 +38,66 @@
             flex-grow: 1;
             min-width: 300px;
         }
-        /* Open-Meteoの表示エリア */
+        .info-panel h2 {
+            margin-top: 0;
+            color: #64b5f6;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        /* 各データ表示エリア */
         #weather-data, #stock-data {
             height: 250px;
             overflow-y: auto;
             line-height: 1.6;
             padding-top: 10px;
         }
-        .weather-day, .stock-item {
+        /* 天気予報の日ごとのスタイル */
+        .weather-day {
             margin-bottom: 10px;
             border-bottom: 1px solid #333;
             padding-bottom: 5px;
         }
-        .stock-value {
-            font-size: 1.5em;
+        .weather-day strong {
+            color: #ffcc00;
+        }
+        /* 株価情報のスタイル */
+        .stock-item {
+            display: flex;
+            justify-content: space-between; /* 左右に配置 */
+            align-items: center;
+            margin-bottom: 8px;
+            border-bottom: 1px dotted #444;
+            padding-bottom: 5px;
+        }
+        .stock-name {
+            font-size: 1.1em;
             font-weight: bold;
+            flex-basis: 40%; /* 名前エリアの幅 */
+        }
+        .stock-value-container {
+            display: flex;
+            align-items: center;
+            flex-basis: 60%; /* 値エリアの幅 */
+            justify-content: flex-end; /* 右寄せ */
+        }
+        .stock-price {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .stock-change {
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap; /* 折り返し禁止 */
         }
         .change-positive { color: #4CAF50; } /* 緑 */
         .change-negative { color: #F44336; } /* 赤 */
+        .change-neutral { color: #aaaaaa; } /* 変化なし */
+        .arrow-up { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #4CAF50; margin-right: 3px; }
+        .arrow-down { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #F44336; margin-right: 3px; }
+        .arrow-neutral { display: inline-block; font-weight: bold; margin-right: 3px; }
+        /* 交通情報リンクの調整 */
         .traffic-link-container {
             display: flex;
             align-items: center;
@@ -86,7 +127,7 @@
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
-        <h2>📈 株価情報（日経平均）</h2>
+        <h2>📈 市況情報</h2>
         <div id="stock-data">
             株価データを読み込み中です...<br>
             ※ご利用にはAPIキーの設定が必要です。
@@ -103,7 +144,7 @@
     </div>
 
     <script>
-        // *** 1. 時刻と日付のスクリプト (変更なし) ***
+        // --- 1. 時刻と日付のスクリプト ---
         function updateTime() {
             const now = new Date();
             const clock = document.getElementById('clock');
@@ -116,15 +157,16 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // *** 2. 天気予報のスクリプト (変更なし) ***
+        // --- 2. 天気予報のスクリプト (Open-Meteo) ---
         async function fetchWeatherData() {
-            // 台東区（東京駅付近）の緯度経度
-            const latitude = 35.6895;
+            const latitude = 35.6895; // 台東区（東京駅付近）
             const longitude = 139.6917;
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo`;
 
             const weatherCodes = {
-                0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️', 45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️',
+                0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️',
+                45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️', 81: '雨☔', 82: '大雨☔',
+                // 必要に応じてコードとアイコンを追加
             };
             
             try {
@@ -142,11 +184,20 @@
                         const maxTemp = data.daily.temperature_2m_max[i];
                         const minTemp = data.daily.temperature_2m_min[i];
                         const weather = weatherCodes[data.daily.weather_code[i]] || '不明';
+                        const precipitation = data.daily.precipitation_probability_max[i];
+
                         const dayLabel = i === 0 ? '【今日】' : `明日 (${dayOfWeek})`;
                         
-                        htmlContent += `<div class="weather-day"><strong>${dayLabel}:</strong> ${weather}<br>${minTemp}°C / ${maxTemp}°C (最低/最高)</div>`;
+                        htmlContent += `
+                            <div class="weather-day">
+                                <strong>${dayLabel}:</strong> ${weather} (${precipitation}%)
+                                <br>
+                                ${minTemp}°C / ${maxTemp}°C (最低/最高)
+                            </div>
+                        `;
                     }
                     container.innerHTML = htmlContent;
+
                 } else {
                     container.textContent = '天気データを取得できませんでした。';
                 }
@@ -157,53 +208,75 @@
         }
         fetchWeatherData();
 
-        // *** 3. 株価情報のスクリプト (Alpha Vantage API) ***
+        // --- 3. 株価情報のスクリプト (Alpha Vantage API) ---
         async function fetchStockData() {
             // !!! ここに取得したAPIキーを設定してください !!!
             const API_KEY = 'YOUR_API_KEY'; 
             
-            // 日経平均株価 (NKY) - 指数情報を取得するAPI
-            // ※「^N225」や「9984.T」などのティッカーシンボルは無料APIでは制限されるため、ここでは代表的な指数 NKY を試します。
-            const symbol = 'NKY'; 
-            const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+            // 取得したいシンボルと表示名
+            const symbols = [
+                { symbol: 'NKY', name: '日経平均' },     // 日経平均
+                { symbol: '^TPX', name: 'TOPIX' },      // TOPIX - 無料版では制限がある場合あり
+                { symbol: 'USDJPY', name: 'USD/JPY' },   // ドル円為替
+                { symbol: '^DJI', name: 'NYダウ' },     // NYダウ
+                { symbol: '^IXIC', name: 'NASDAQ' }     // NASDAQ
+            ];
             const container = document.getElementById('stock-data');
 
-            if (API_KEY === 'AQW7306BT8O0CGNY') {
+            if (API_KEY === 'YOUR_API_KEY') {
                 container.innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
                 return;
             }
+            container.innerHTML = '株価データを読み込み中です...';
 
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data['Global Quote']) {
-                    const quote = data['Global Quote'];
-                    const price = parseFloat(quote['05. price']).toFixed(2);
-                    const change = parseFloat(quote['09. change']).toFixed(2);
-                    const changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
+            let htmlContent = '';
+            for (const item of symbols) {
+                const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${API_KEY}`;
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data['Global Quote']) {
+                        const quote = data['Global Quote'];
+                        const price = parseFloat(quote['05. price']).toFixed(2);
+                        const change = parseFloat(quote['09. change']).toFixed(2);
+                        const changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
 
-                    const changeClass = change >= 0 ? 'change-positive' : 'change-negative';
-                    const sign = change >= 0 ? '+' : '';
+                        let changeClass = 'change-neutral';
+                        let arrow = '<span class="arrow-neutral">ー</span>';
+                        if (change > 0) {
+                            changeClass = 'change-positive';
+                            arrow = '<span class="arrow-up"></span>';
+                        } else if (change < 0) {
+                            changeClass = 'change-negative';
+                            arrow = '<span class="arrow-down"></span>';
+                        }
+                        const sign = change >= 0 ? '+' : '';
 
-                    container.innerHTML = `
-                        <div class="stock-item">
-                            <div class="stock-value">${price}</div>
-                            <div class="${changeClass}">
-                                ${sign}${change} (${sign}${changePercent}%)
+                        htmlContent += `
+                            <div class="stock-item">
+                                <span class="stock-name">${item.name}</span>
+                                <div class="stock-value-container">
+                                    <span class="stock-price">${price}</span>
+                                    <span class="stock-change ${changeClass}">
+                                        ${arrow} ${sign}${change} (${sign}${changePercent}%)
+                                    </span>
+                                </div>
                             </div>
-                            <p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
-                                ※データは遅延または市場営業時間外のものです。
-                            </p>
-                        </div>
-                    `;
-                } else {
-                    container.textContent = '株価データを取得できませんでした。APIキーやシンボルを確認してください。';
+                        `;
+                    } else {
+                        htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">データ取得不可</span></div>`;
+                    }
+                } catch (error) {
+                    htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">エラー</span></div>`;
                 }
-
-            } catch (error) {
-                container.textContent = '株価データ取得中にエラーが発生しました。';
+                // APIレートリミット対策: 各リクエスト間に少し待機 (無料プランは1分間に5回まで)
+                await new Promise(resolve => setTimeout(resolve, 13000)); // 13秒待機
             }
+            container.innerHTML = htmlContent + `<p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
+                ※データは遅延または市場営業時間外のものです。<br>
+                ※APIレート制限のため表示に時間がかかる場合があります。
+            </p>`;
         }
         fetchStockData();
     </script>
