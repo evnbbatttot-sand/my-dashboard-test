@@ -3,38 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終版v9: 時刻安定化）</title>
+    <title>情報ダッシュボード（最終版v10: 全コンテンツ表示回復）</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <script>
-        function updateTime() {
-            const now = new Date();
-            const clock = document.getElementById('clock');
-            const date = document.getElementById('date');
-            
-            // clockとdate要素が存在することを確認
-            if (!clock || !date) return;
-
-            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
-            clock.textContent = now.toLocaleTimeString('ja-JP', timeOptions);
-            const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
-            date.textContent = now.toLocaleDateString('ja-JP', dateOptions);
-        }
-        
-        // ページ読み込み完了時ではなく、DOMツリーが構成された時点で実行を試みる
-        document.addEventListener('DOMContentLoaded', () => {
-            updateTime();
-            // 1秒ごとに更新
-            setInterval(updateTime, 1000); 
-        });
-        
-        // DOMContentLoadedが間に合わない場合に備えて、一度ここで実行（ただし要素はまだ存在しない可能性がある）
-        // updateTime(); // bodyに要素があるため、DOMContentLoadedで十分
-    </script>
-    
     <style>
-        /* (CSSはv8と共通) */
-        /* ... 省略 ... */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -45,8 +17,36 @@
             flex-wrap: wrap;
             gap: 20px;
         }
-        /* ... 省略 ... */
-        /* ★再修正: グラフ下の天気アイコン表示エリア */
+        .header {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 2px solid #333;
+        }
+        #clock { font-size: 3em; font-weight: bold; }
+        #date { font-size: 1.5em; color: #aaa; }
+        .info-panel {
+            background-color: #2a2a2a;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            flex-grow: 1;
+            min-width: 300px;
+        }
+        .info-panel h2 {
+            margin-top: 0;
+            color: #64b5f6;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        /* --- 天気予報の表示エリア --- */
+        #weather-chart-container {
+            height: 320px;
+            padding-top: 10px;
+            position: relative;
+        }
+        /* ★再修正: グラフ下の天気アイコン表示エリア (v8/v9の調整を維持) */
         #weather-icons {
             display: flex;
             justify-content: space-around; 
@@ -64,7 +64,35 @@
             max-width: 14.28%; 
             margin-left: -5px; 
         }
-        /* ... 省略 ... */
+        /* --- 株価情報のスタイル --- */
+        #stock-data { padding-top: 10px; height: 350px; overflow-y: auto; }
+        .stock-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dotted #444; padding-bottom: 5px; }
+        .stock-name { font-size: 1.1em; font-weight: bold; flex-basis: 35%; }
+        .stock-value-container { display: flex; align-items: center; flex-basis: 65%; justify-content: flex-end; }
+        .stock-price { font-size: 1.2em; font-weight: bold; margin-right: 5px; }
+        .stock-change { font-size: 0.9em; display: flex; align-items: center; white-space: nowrap; }
+        .change-positive { color: #4CAF50; } .change-negative { color: #F44336; } .change-neutral { color: #aaaaaa; }
+        .arrow-up { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #4CAF50; margin-right: 3px; }
+        .arrow-down { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #F44336; margin-right: 3px; }
+        .arrow-neutral { display: inline-block; font-weight: bold; margin-right: 3px; }
+        /* --- 交通情報リンクの調整 --- */
+        .traffic-link-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            height: 200px;
+            padding: 20px;
+        }
+        .traffic-link-container a {
+            color: #64b5f6;
+            font-size: 1.2em;
+            text-decoration: none;
+            margin-bottom: 10px;
+        }
+        .traffic-link-container a:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -74,16 +102,66 @@
         <div id="date">YYYY年MM月DD日 (曜日)</div>
     </div>
 
+    <div class="info-panel" style="flex-basis: 45%;">
+        <h2>🌤️ 天気予報（1週間）</h2>
+        <div id="weather-chart-container">
+            <canvas id="weatherChart"></canvas>
+            <div id="weather-icons"></div>
+        </div>
+    </div>
+
+    <div class="info-panel" style="flex-basis: 45%;">
+        <h2>📈 市況情報（主要指数・為替・商品・仮想通貨）</h2>
+        <div id="stock-data">
+            株価データを読み込み中です...<br>
+            ⚠️ APIキーが未設定です。設定後に再読み込みしてください。
+        </div>
+    </div>
+
+    <div class="info-panel" style="flex-basis: 100%;">
+        <h2>🚃 運行状況</h2>
+        <div class="traffic-link-container">
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=yamanoteline" target="_blank" title="JR山手線の運行情報">
+                JR山手線 運行情報へ
+            </a>
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=sobuline_rapidservice" target="_blank" title="JR総武快速線の運行情報">
+                JR総武快速線 運行情報へ
+            </a>
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=sobuline_local" target="_blank" title="JR中央・総武各駅停車の運行情報">
+                JR中央・総武各駅停車 運行情報へ
+            </a>
+            <a href="https://www.kotsu.metro.tokyo.jp/subway/schedule/" target="_blank" title="都営浅草線の運行情報">
+                都営浅草線 運行情報へ
+            </a>
+        </div>
+    </div>
+
     <script>
         // !!! APIキーをここに設定してください !!!
         const API_KEY = 'AQW7306BT8O0CGNY'; 
 
-        // --- 1. 時刻と日付のスクリプト (削除 - headに移動したため) ---
-        // 既存のコードから削除してください。
-        
-        // --- 2. 天気予報のスクリプト (変更なし) ---
+        // --- 1. 時刻と日付のスクリプト ---
+        function updateTime() {
+            const now = new Date();
+            const clock = document.getElementById('clock');
+            const date = document.getElementById('date');
+            
+            // 要素が存在する場合のみ更新
+            if (clock) {
+                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                clock.textContent = now.toLocaleTimeString('ja-JP', timeOptions);
+            }
+            if (date) {
+                const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+                date.textContent = now.toLocaleDateString('ja-JP', dateOptions);
+            }
+        }
+        // ページ読み込み時に一度実行し、その後1秒ごとに更新
+        updateTime(); 
+        setInterval(updateTime, 1000); 
+
+        // --- 2. 天気予報のスクリプト ---
         async function fetchWeatherData() {
-             // ... 省略（v8と同じ） ...
             const latitude = 35.6895; 
             const longitude = 139.6917;
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=7`;
@@ -116,46 +194,49 @@
                         const icon = weatherCodes[weatherCodesDaily[i]] ? weatherCodes[weatherCodesDaily[i]].icon : '？';
                         iconHtml += `<div class="weather-icon-day">${icon}</div>`;
                     }
-                    document.getElementById('weather-icons').innerHTML = iconHtml;
+                    const weatherIconsDiv = document.getElementById('weather-icons');
+                    if (weatherIconsDiv) {
+                        weatherIconsDiv.innerHTML = iconHtml;
+                    }
 
-                    const ctx = document.getElementById('weatherChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: '最高気温 (°C)', data: maxTemps, borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.2)', yAxisID: 'temp', tension: 0.4
-                            }, {
-                                label: '最低気温 (°C)', data: minTemps, borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.2)', yAxisID: 'temp', tension: 0.4
-                            }, {
-                                type: 'bar', label: '降水確率 (%)', data: precipitations, backgroundColor: 'rgba(75, 192, 192, 0.5)', yAxisID: 'precip',
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            scales: {
-                                temp: { type: 'linear', position: 'left', title: { display: true, text: '気温 (°C)' }, grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
-                                x: { grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
-                                precip: { type: 'linear', position: 'right', max: 100, title: { display: true, text: '降水確率 (%)' }, grid: { drawOnChartArea: false, color: '#333' }, ticks: { color: '#f0f0f0' } }
+                    const ctx = document.getElementById('weatherChart');
+                    if (ctx) { // canvas要素が存在することを確認
+                        new Chart(ctx.getContext('2d'), {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: '最高気温 (°C)', data: maxTemps, borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.2)', yAxisID: 'temp', tension: 0.4
+                                }, {
+                                    label: '最低気温 (°C)', data: minTemps, borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.2)', yAxisID: 'temp', tension: 0.4
+                                }, {
+                                    type: 'bar', label: '降水確率 (%)', data: precipitations, backgroundColor: 'rgba(75, 192, 192, 0.5)', yAxisID: 'precip',
+                                }]
                             },
-                            plugins: { legend: { labels: { color: '#f0f0f0' } } }
-                        }
-                    });
+                            options: {
+                                responsive: true, maintainAspectRatio: false,
+                                scales: {
+                                    temp: { type: 'linear', position: 'left', title: { display: true, text: '気温 (°C)' }, grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
+                                    x: { grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
+                                    precip: { type: 'linear', position: 'right', max: 100, title: { display: true, text: '降水確率 (%)' }, grid: { drawOnChartArea: false, color: '#333' }, ticks: { color: '#f0f0f0' } }
+                                },
+                                plugins: { legend: { labels: { color: '#f0f0f0' } } }
+                            }
+                        });
+                    }
 
                 } else {
-                    document.getElementById('weatherChart').textContent = '天気データを取得できませんでした。';
+                    const container = document.getElementById('weather-chart-container');
+                    if (container) container.innerHTML = '天気データを取得できませんでした。';
                 }
             } catch (error) {
-                document.getElementById('weather-chart-container').innerHTML = '天気データ取得中にエラーが発生しました。';
+                const container = document.getElementById('weather-chart-container');
+                if (container) container.innerHTML = `天気データ取得中にエラーが発生しました: ${error.message}`;
             }
         }
-        fetchWeatherData();
-
-        // --- 3. 株価情報のスクリプト (変更なし) ---
         
-        // 補助関数: 表示HTMLの生成 (変更なし)
+        // --- 3. 株価情報のスクリプト ---
         function createStockHtml(name, price, change, changePercent) {
-            // ... 省略（v8と同じ） ...
             let changeClass = 'change-neutral';
             let arrow = '<span class="arrow-neutral">ー</span>';
             const isChange = !isNaN(change);
@@ -185,9 +266,7 @@
             `;
         }
 
-        // 株価/為替/商品を取得する
         async function fetchStockAndCommodityData() {
-            // ... 省略（v8と同じ） ...
             const symbols = [
                 { symbol: 'NKY', name: '日経平均', type: 'stock' },     
                 { symbol: 'MSFT', name: 'NASDAQ（代替）', type: 'stock' },
@@ -200,7 +279,10 @@
             const container = document.getElementById('stock-data');
             let htmlContent = '';
             
-            if (API_KEY === 'YOUR_API_KEY') return;
+            if (API_KEY === 'YOUR_API_KEY') {
+                if (container) container.innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
+                return null; // APIキーがない場合は処理を中断
+            }
 
             for (const item of symbols) {
                 let url;
@@ -242,15 +324,12 @@
                 }
                 await new Promise(resolve => setTimeout(resolve, 13000));
             }
-            document.getElementById('stock-data').innerHTML = htmlContent;
-            return document.getElementById('stock-data');
+            if (container) container.innerHTML = htmlContent;
+            return container;
         }
 
-
-        // 仮想通貨 (Crypto) を取得する (BTC/JPYに変換)
         async function fetchCryptoData(container) {
-            // ... 省略（v8と同じ） ...
-            if (API_KEY === 'YOUR_API_KEY') return;
+            if (API_KEY === 'YOUR_API_KEY') return; // APIキーがない場合は処理しない
 
             const cryptoSymbol = 'BTC';
             const marketSymbol = 'USD';
@@ -278,12 +357,12 @@
                 const btcPriceJPY = (btcPriceUSD * usdJpyRate).toFixed(0);
                 const cryptoHtml = createStockHtml('ビットコイン (JPY)', btcPriceJPY, NaN, NaN);
                 
-                container.innerHTML += cryptoHtml;
+                if (container) container.innerHTML += cryptoHtml;
             } else {
-                container.innerHTML += `<div class="stock-item"><span class="stock-name">ビットコイン (JPY)</span><span style="color: #f44336;">データ取得不可</span></div>`;
+                if (container) container.innerHTML += `<div class="stock-item"><span class="stock-name">ビットコイン (JPY)</span><span style="color: #f44336;">データ取得不可</span></div>`;
             }
 
-            container.innerHTML += `<p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
+            if (container) container.innerHTML += `<p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
                 ※データは遅延または市場営業時間外のものです。<br>
                 ※APIレート制限のため表示に時間がかかる場合があります。
             </p>`;
@@ -291,13 +370,20 @@
 
         // すべてのデータを順次取得開始
         (async () => {
+             // APIキーが設定されていない場合でも、まずは場所を確保し、エラーメッセージを表示
+             const stockDataContainer = document.getElementById('stock-data');
              if (API_KEY === 'YOUR_API_KEY') {
-                document.getElementById('stock-data').innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
-                return;
+                if (stockDataContainer) stockDataContainer.innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
              }
              
-             const container = await fetchStockAndCommodityData(); 
-             if (container) await fetchCryptoData(container);
+             // APIキーが設定されている場合のみ、データをフェッチ
+             if (API_KEY !== 'YOUR_API_KEY') {
+                const container = await fetchStockAndCommodityData(); 
+                if (container) await fetchCryptoData(container);
+             }
+
+             // 天気予報はAPIキーに依存しないため、常に実行
+             fetchWeatherData();
         })();
     </script>
 </body>
