@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終調整版）</title>
+    <title>情報ダッシュボード（グラフ版）</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* (CSSスタイルは以前のものをベースに調整) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -44,26 +46,20 @@
             border-bottom: 1px solid #444;
             padding-bottom: 5px;
         }
-        /* 各データ表示エリア */
-        #weather-data, #stock-data {
-            height: 250px;
-            overflow-y: auto;
-            line-height: 1.6;
+        /* 天気予報の表示エリア */
+        #weather-chart-container {
+            height: 300px; /* チャート表示用に高さを確保 */
             padding-top: 10px;
         }
-        /* 天気予報の日ごとのスタイル */
-        .weather-day {
-            margin-bottom: 10px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 5px;
-        }
-        .weather-day strong {
-            color: #ffcc00;
-        }
         /* 株価情報のスタイル */
+        #stock-data {
+            padding-top: 10px;
+            height: 250px;
+            overflow-y: auto;
+        }
         .stock-item {
             display: flex;
-            justify-content: space-between; /* 左右に配置 */
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
             border-bottom: 1px dotted #444;
@@ -72,13 +68,13 @@
         .stock-name {
             font-size: 1.1em;
             font-weight: bold;
-            flex-basis: 40%; /* 名前エリアの幅 */
+            flex-basis: 35%;
         }
         .stock-value-container {
             display: flex;
             align-items: center;
-            flex-basis: 60%; /* 値エリアの幅 */
-            justify-content: flex-end; /* 右寄せ */
+            flex-basis: 65%;
+            justify-content: flex-end;
         }
         .stock-price {
             font-size: 1.2em;
@@ -89,11 +85,11 @@
             font-size: 0.9em;
             display: flex;
             align-items: center;
-            white-space: nowrap; /* 折り返し禁止 */
+            white-space: nowrap;
         }
-        .change-positive { color: #4CAF50; } /* 緑 */
-        .change-negative { color: #F44336; } /* 赤 */
-        .change-neutral { color: #aaaaaa; } /* 変化なし */
+        .change-positive { color: #4CAF50; }
+        .change-negative { color: #F44336; }
+        .change-neutral { color: #aaaaaa; }
         .arrow-up { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #4CAF50; margin-right: 3px; }
         .arrow-down { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #F44336; margin-right: 3px; }
         .arrow-neutral { display: inline-block; font-weight: bold; margin-right: 3px; }
@@ -120,14 +116,15 @@
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
-        <h2>🌤️ 天気予報（台東区）</h2>
-        <div id="weather-data">
-            天気データを読み込み中です...
+        <h2>🌤️ 天気予報（1週間）</h2>
+        <div id="weather-chart-container">
+            <canvas id="weatherChart"></canvas>
+            <div id="weather-summary" style="font-size:0.9em; margin-top:10px;"></div>
         </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
-        <h2>📈 市況情報</h2>
+        <h2>📈 市況情報（主要指数・為替）</h2>
         <div id="stock-data">
             株価データを読み込み中です...<br>
             ※ご利用にはAPIキーの設定が必要です。
@@ -157,53 +154,95 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- 2. 天気予報のスクリプト (Open-Meteo) ---
+        // --- 2. 天気予報のスクリプト (Open-Meteo / グラフ化) ---
         async function fetchWeatherData() {
             const latitude = 35.6895; // 台東区（東京駅付近）
             const longitude = 139.6917;
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo`;
+            // 7日間の予報と降水確率を取得
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=7`;
 
             const weatherCodes = {
-                0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️',
-                45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️', 81: '雨☔', 82: '大雨☔',
-                // 必要に応じてコードとアイコンを追加
+                0: '快晴', 1: '晴れ', 2: '晴れ時々曇り', 3: '曇り', 45: '霧', 51: '小雨', 61: '雨', 71: '小雪', 80: 'にわか雨', 81: '雨', 82: '大雨',
             };
             
             try {
                 const response = await fetch(url);
                 const data = await response.json();
-                const container = document.getElementById('weather-data');
-                container.innerHTML = '';
                 
                 if (data.daily && data.daily.time) {
-                    let htmlContent = '';
-                    for (let i = 0; i < 3 && i < data.daily.time.length; i++) {
-                        const dateStr = data.daily.time[i];
-                        const date = new Date(dateStr);
-                        const dayOfWeek = date.toLocaleDateString('ja-JP', { weekday: 'short' });
-                        const maxTemp = data.daily.temperature_2m_max[i];
-                        const minTemp = data.daily.temperature_2m_min[i];
-                        const weather = weatherCodes[data.daily.weather_code[i]] || '不明';
-                        const precipitation = data.daily.precipitation_probability_max[i];
+                    const days = data.daily.time.map(dateStr => new Date(dateStr).toLocaleDateString('ja-JP', { weekday: 'short' }));
+                    const maxTemps = data.daily.temperature_2m_max;
+                    const minTemps = data.daily.temperature_2m_min;
+                    const precipitations = data.daily.precipitation_probability_max;
+                    const weatherCodesDaily = data.daily.weather_code;
 
-                        const dayLabel = i === 0 ? '【今日】' : `明日 (${dayOfWeek})`;
-                        
-                        htmlContent += `
-                            <div class="weather-day">
-                                <strong>${dayLabel}:</strong> ${weather} (${precipitation}%)
-                                <br>
-                                ${minTemp}°C / ${maxTemp}°C (最低/最高)
-                            </div>
-                        `;
-                    }
-                    container.innerHTML = htmlContent;
+                    // 概要（テキスト）表示
+                    const todayWeather = weatherCodes[weatherCodesDaily[0]] || '不明';
+                    const todayPrecip = precipitations[0];
+                    document.getElementById('weather-summary').innerHTML = `
+                        **今日**: ${todayWeather}、降水確率 ${todayPrecip}%。<br>
+                        最高 ${maxTemps[0]}°C / 最低 ${minTemps[0]}°C
+                    `;
+
+                    // Chart.jsでグラフ描画
+                    const ctx = document.getElementById('weatherChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line', // 気温は折れ線グラフ
+                        data: {
+                            labels: days,
+                            datasets: [{
+                                label: '最高気温 (°C)',
+                                data: maxTemps,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                yAxisID: 'temp',
+                                tension: 0.4
+                            }, {
+                                label: '最低気温 (°C)',
+                                data: minTemps,
+                                borderColor: 'rgb(54, 162, 235)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                yAxisID: 'temp',
+                                tension: 0.4
+                            }, {
+                                type: 'bar', // 降水確率は棒グラフ
+                                label: '降水確率 (%)',
+                                data: precipitations,
+                                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                yAxisID: 'precip',
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                temp: {
+                                    type: 'linear',
+                                    position: 'left',
+                                    title: { display: true, text: '気温 (°C)' },
+                                    grid: { color: '#333' },
+                                    ticks: { color: '#f0f0f0' }
+                                },
+                                precip: {
+                                    type: 'linear',
+                                    position: 'right',
+                                    max: 100,
+                                    title: { display: true, text: '降水確率 (%)' },
+                                    grid: { drawOnChartArea: false, color: '#333' }, // 温度グラフと重ならないように
+                                    ticks: { color: '#f0f0f0' }
+                                }
+                            },
+                            plugins: {
+                                legend: { labels: { color: '#f0f0f0' } }
+                            }
+                        }
+                    });
 
                 } else {
-                    container.textContent = '天気データを取得できませんでした。';
+                    document.getElementById('weatherChart').textContent = '天気データを取得できませんでした。';
                 }
-
             } catch (error) {
-                document.getElementById('weather-data').textContent = '天気データ取得中にエラーが発生しました。';
+                document.getElementById('weather-chart-container').innerHTML = '天気データ取得中にエラーが発生しました。';
             }
         }
         fetchWeatherData();
@@ -211,16 +250,15 @@
         // --- 3. 株価情報のスクリプト (Alpha Vantage API) ---
         async function fetchStockData() {
             // !!! ここに取得したAPIキーを設定してください !!!
-            const API_KEY = 'AQW7306BT8O0CGNY'; 
+            const API_KEY = 'YOUR_API_KEY'; 
             
-            // 取得したいシンボルと表示名
+            // 取得したいシンボルと表示名 (成功・失敗を考慮して絞り込み)
             const symbols = [
-                { symbol: 'NKY', name: '日経平均' },     // 日経平均
-                { symbol: '^TPX', name: 'TOPIX' },      // TOPIX - 無料版では制限がある場合あり
-                { symbol: 'USDJPY', name: 'USD/JPY' },   // ドル円為替
-                { symbol: '^DJI', name: 'NYダウ' },     // NYダウ
-                { symbol: '^IXIC', name: 'NASDAQ' }     // NASDAQ
+                { symbol: 'NKY', name: '日経平均' },     // 指数
+                { symbol: 'MSFT', name: 'NASDAQ' },      // NASDAQの代わりにマイクロソフトの株価を使用（代替案）
+                { symbol: 'USDJPY', name: 'USD/JPY' }     // 為替
             ];
+
             const container = document.getElementById('stock-data');
 
             if (API_KEY === 'YOUR_API_KEY') {
@@ -231,47 +269,67 @@
 
             let htmlContent = '';
             for (const item of symbols) {
-                const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${API_KEY}`;
+                // 為替の場合は異なるAPI関数を使用
+                let url;
+                if (item.symbol === 'USDJPY') {
+                    // 通貨換算のAPIを使用
+                    url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=USD&to_currency=JPY&apikey=${API_KEY}`;
+                } else {
+                    // 通常のGLOBAL_QUOTEを使用
+                    url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${API_KEY}`;
+                }
+
                 try {
                     const response = await fetch(url);
                     const data = await response.json();
                     
-                    if (data['Global Quote']) {
+                    let price, change, changePercent;
+                    if (item.symbol === 'USDJPY' && data['Realtime Currency Exchange Rate']) {
+                        const rate = data['Realtime Currency Exchange Rate'];
+                        price = parseFloat(rate['5. Exchange Rate']).toFixed(2);
+                        change = 'N/A'; // 為替のリアルタイムな変動は取得が複雑なため一旦N/A
+                        changePercent = 'N/A';
+                    } else if (data['Global Quote']) {
                         const quote = data['Global Quote'];
-                        const price = parseFloat(quote['05. price']).toFixed(2);
-                        const change = parseFloat(quote['09. change']).toFixed(2);
-                        const changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
-
-                        let changeClass = 'change-neutral';
-                        let arrow = '<span class="arrow-neutral">ー</span>';
-                        if (change > 0) {
-                            changeClass = 'change-positive';
-                            arrow = '<span class="arrow-up"></span>';
-                        } else if (change < 0) {
-                            changeClass = 'change-negative';
-                            arrow = '<span class="arrow-down"></span>';
-                        }
-                        const sign = change >= 0 ? '+' : '';
-
-                        htmlContent += `
-                            <div class="stock-item">
-                                <span class="stock-name">${item.name}</span>
-                                <div class="stock-value-container">
-                                    <span class="stock-price">${price}</span>
-                                    <span class="stock-change ${changeClass}">
-                                        ${arrow} ${sign}${change} (${sign}${changePercent}%)
-                                    </span>
-                                </div>
-                            </div>
-                        `;
+                        price = parseFloat(quote['05. price']).toFixed(2);
+                        change = parseFloat(quote['09. change']).toFixed(2);
+                        changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
                     } else {
                         htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">データ取得不可</span></div>`;
+                        await new Promise(resolve => setTimeout(resolve, 13000)); // レート制限対策
+                        continue;
                     }
+
+                    let changeClass = 'change-neutral';
+                    let arrow = '<span class="arrow-neutral">ー</span>';
+                    if (!isNaN(change) && change > 0) {
+                        changeClass = 'change-positive';
+                        arrow = '<span class="arrow-up"></span>';
+                    } else if (!isNaN(change) && change < 0) {
+                        changeClass = 'change-negative';
+                        arrow = '<span class="arrow-down"></span>';
+                    }
+                    const sign = !isNaN(change) && change >= 0 ? '+' : '';
+                    const displayChange = isNaN(change) ? 'N/A' : `${sign}${change}`;
+                    const displayPercent = isNaN(changePercent) ? '' : `(${sign}${changePercent}%)`;
+
+
+                    htmlContent += `
+                        <div class="stock-item">
+                            <span class="stock-name">${item.name}</span>
+                            <div class="stock-value-container">
+                                <span class="stock-price">${price}</span>
+                                <span class="stock-change ${changeClass}">
+                                    ${arrow} ${displayChange} ${displayPercent}
+                                </span>
+                            </div>
+                        </div>
+                    `;
                 } catch (error) {
                     htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">エラー</span></div>`;
                 }
-                // APIレートリミット対策: 各リクエスト間に少し待機 (無料プランは1分間に5回まで)
-                await new Promise(resolve => setTimeout(resolve, 13000)); // 13秒待機
+                // APIレートリミット対策: 各リクエスト間に待機 (無料プランは1分間に5回まで)
+                await new Promise(resolve => setTimeout(resolve, 13000));
             }
             container.innerHTML = htmlContent + `<p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
                 ※データは遅延または市場営業時間外のものです。<br>
