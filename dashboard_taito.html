@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終版v6: 天気修正）</title>
+    <title>情報ダッシュボード（最終版v7: 全機能搭載）</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* (基本スタイルはv5と共通) */
+        /* (基本スタイルは共通) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -24,14 +24,8 @@
             padding: 10px 0;
             border-bottom: 2px solid #333;
         }
-        #clock {
-            font-size: 3em;
-            font-weight: bold;
-        }
-        #date {
-            font-size: 1.5em;
-            color: #aaa;
-        }
+        #clock { font-size: 3em; font-weight: bold; }
+        #date { font-size: 1.5em; color: #aaa; }
         .info-panel {
             background-color: #2a2a2a;
             border-radius: 10px;
@@ -46,18 +40,19 @@
             border-bottom: 1px solid #444;
             padding-bottom: 5px;
         }
-        /* 天気予報の表示エリア */
+        /* --- 天気予報の表示エリア --- */
         #weather-chart-container {
-            height: 300px;
+            height: 320px;
             padding-top: 10px;
-            position: relative; /* アイコン配置の基準とする */
+            position: relative;
         }
-        /* グラフ下の天気アイコン表示エリア */
+        /* ★修正: グラフ下の天気アイコン表示エリア */
         #weather-icons {
             display: flex;
-            justify-content: space-between; /* 均等ではなく、両端を基準に配置 */
-            padding: 5px 25px 0 25px; /* グラフの横軸の描画エリアに合わせて左右の余白を調整 */
-            margin-top: -20px; /* グラフに近づける */
+            justify-content: space-between; 
+            /* グラフ描画エリアの端に近くなるようパディングを調整 */
+            padding: 5px 15px 0 15px; 
+            margin-top: -20px; 
             font-size: 1.5em;
             position: relative;
             z-index: 10;
@@ -65,10 +60,10 @@
         .weather-icon-day {
             text-align: center;
             flex: 1;
-            max-width: 14.28%; /* 7分割 */
+            max-width: 14.28%; /* 7日分で均等幅 */
         }
-        /* 株価情報のスタイル (変更なし) */
-        #stock-data { padding-top: 10px; height: 250px; overflow-y: auto; }
+        /* --- 株価情報のスタイル --- */
+        #stock-data { padding-top: 10px; height: 350px; overflow-y: auto; }
         .stock-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dotted #444; padding-bottom: 5px; }
         .stock-name { font-size: 1.1em; font-weight: bold; flex-basis: 35%; }
         .stock-value-container { display: flex; align-items: center; flex-basis: 65%; justify-content: flex-end; }
@@ -78,7 +73,7 @@
         .arrow-up { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #4CAF50; margin-right: 3px; }
         .arrow-down { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #F44336; margin-right: 3px; }
         .arrow-neutral { display: inline-block; font-weight: bold; margin-right: 3px; }
-        /* 交通情報リンクの調整 (変更なし) */
+        /* 交通情報リンクの調整 */
         .traffic-link-container { display: flex; align-items: center; justify-content: center; height: 200px; padding: 20px; }
         .traffic-link-container a { color: #64b5f6; font-size: 1.5em; text-decoration: none; }
     </style>
@@ -95,12 +90,11 @@
         <div id="weather-chart-container">
             <canvas id="weatherChart"></canvas>
             <div id="weather-icons"></div>
-            <div id="weather-summary" style="font-size:0.9em; margin-top:10px;"></div>
-        </div>
+            </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
-        <h2>📈 市況情報（主要指数・為替・仮想通貨）</h2>
+        <h2>📈 市況情報（主要指数・為替・商品・仮想通貨）</h2>
         <div id="stock-data">
             株価データを読み込み中です...<br>
             ⚠️ APIキーが未設定です。設定後に再読み込みしてください。
@@ -133,7 +127,7 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // --- 2. 天気予報のスクリプト (修正箇所) ---
+        // --- 2. 天気予報のスクリプト (変更なし) ---
         async function fetchWeatherData() {
             const latitude = 35.6895; 
             const longitude = 139.6917;
@@ -150,11 +144,10 @@
                 const data = await response.json();
                 
                 if (data.daily && data.daily.time) {
-                    // ★修正: ラベルを「日付(曜日)」に変更
+                    // ラベルを「日付(曜日)」に変更
                     const labels = data.daily.time.map(dateStr => {
                         const date = new Date(dateStr);
                         const day = date.getDate();
-                        // 曜日の短縮形を取得 (月, 火, 水...)
                         const dayOfWeek = date.toLocaleDateString('ja-JP', { weekday: 'short' });
                         return `${day}(${dayOfWeek})`;
                     });
@@ -164,14 +157,7 @@
                     const precipitations = data.daily.precipitation_probability_max;
                     const weatherCodesDaily = data.daily.weather_code;
 
-                    const todayWeather = weatherCodes[weatherCodesDaily[0]] ? weatherCodes[weatherCodesDaily[0]].text : '不明';
-                    const todayPrecip = precipitations[0];
-                    document.getElementById('weather-summary').innerHTML = `
-                        **今日**: ${todayWeather} ${weatherCodes[weatherCodesDaily[0]].icon}、降水確率 ${todayPrecip}%。<br>
-                        最高 ${maxTemps[0]}°C / 最低 ${minTemps[0]}°C
-                    `;
-
-                    // グラフ下のアイコン表示 (変更なし)
+                    // グラフ下のアイコン表示
                     let iconHtml = '';
                     for (let i = 0; i < labels.length; i++) {
                         const icon = weatherCodes[weatherCodesDaily[i]] ? weatherCodes[weatherCodesDaily[i]].icon : '？';
@@ -197,6 +183,7 @@
                             responsive: true, maintainAspectRatio: false,
                             scales: {
                                 temp: { type: 'linear', position: 'left', title: { display: true, text: '気温 (°C)' }, grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
+                                x: { grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
                                 precip: { type: 'linear', position: 'right', max: 100, title: { display: true, text: '降水確率 (%)' }, grid: { drawOnChartArea: false, color: '#333' }, ticks: { color: '#f0f0f0' } }
                             },
                             plugins: { legend: { labels: { color: '#f0f0f0' } } }
@@ -212,9 +199,9 @@
         }
         fetchWeatherData();
 
-        // --- 3. 株価情報のスクリプト (変更なし: v5と同じ) ---
+        // --- 3. 株価情報のスクリプト (項目追加) ---
         
-        // 補助関数: 表示HTMLの生成
+        // 補助関数: 表示HTMLの生成 (変更なし)
         function createStockHtml(name, price, change, changePercent) {
             let changeClass = 'change-neutral';
             let arrow = '<span class="arrow-neutral">ー</span>';
@@ -245,14 +232,16 @@
             `;
         }
 
-
-        // 株価 (Stock) と為替 (FX) を取得する
-        async function fetchStockAndFXData() {
+        // 株価/為替/商品を取得する
+        async function fetchStockAndCommodityData() {
+            // ★追加: GOLD (金)とWTI (原油)を追加
             const symbols = [
                 { symbol: 'NKY', name: '日経平均', type: 'stock' },     
                 { symbol: 'MSFT', name: 'NASDAQ（代替）', type: 'stock' },
                 { symbol: 'USDJPY', name: 'USD/JPY', type: 'fx' },     
                 { symbol: 'EURJPY', name: 'EUR/JPY', type: 'fx' },     
+                { symbol: 'GOLD', name: '金 (USD)', type: 'commodity' }, // GOLD
+                { symbol: 'WTI', name: '原油 (USD)', type: 'commodity' }, // Crude Oil
             ];
 
             const container = document.getElementById('stock-data');
@@ -262,12 +251,14 @@
 
             for (const item of symbols) {
                 let url;
+                let pricePrecision = (item.symbol === 'GOLD' || item.symbol === 'WTI') ? 2 : 2; // 商品も2桁に設定
 
                 if (item.type === 'fx') {
                     const fromCurrency = item.symbol.substring(0, 3);
                     const toCurrency = item.symbol.substring(3, 6);
                     url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${API_KEY}`;
                 } else {
+                    // 株/指数/商品
                     url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${API_KEY}`;
                 }
 
@@ -278,13 +269,15 @@
                     let price, change, changePercent;
                     
                     if (data['Realtime Currency Exchange Rate']) {
+                        // 為替の場合
                         const rate = data['Realtime Currency Exchange Rate'];
                         price = parseFloat(rate['5. Exchange Rate']).toFixed(2);
                         change = NaN; changePercent = NaN;
                     } else if (data['Global Quote']) {
+                        // 株/指数/商品の場合
                         const quote = data['Global Quote'];
-                        price = parseFloat(quote['05. price']).toFixed(2);
-                        change = parseFloat(quote['09. change']).toFixed(2);
+                        price = parseFloat(quote['05. price']).toFixed(pricePrecision);
+                        change = parseFloat(quote['09. change']).toFixed(pricePrecision);
                         changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
                     } else {
                         htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">データ取得不可</span></div>`;
@@ -297,14 +290,16 @@
                 } catch (error) {
                     htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">エラー</span></div>`;
                 }
-                await new Promise(resolve => setTimeout(resolve, 13000)); 
+                await new Promise(resolve => setTimeout(resolve, 13000)); // APIレート制限対策
             }
-            container.innerHTML = htmlContent;
+            // 既存のコンテンツを初期化し、株と為替と商品を追加
+            document.getElementById('stock-data').innerHTML = htmlContent;
+            return document.getElementById('stock-data');
         }
 
 
         // 仮想通貨 (Crypto) を取得する (BTC/JPYに変換)
-        async function fetchCryptoData() {
+        async function fetchCryptoData(container) {
             if (API_KEY === 'YOUR_API_KEY') return;
 
             const cryptoSymbol = 'BTC';
@@ -329,8 +324,6 @@
                 usdJpyRate = parseFloat(fxData['Realtime Currency Exchange Rate']['5. Exchange Rate']);
             } catch (e) { usdJpyRate = null; }
 
-            const container = document.getElementById('stock-data');
-
             if (btcPriceUSD && usdJpyRate) {
                 const btcPriceJPY = (btcPriceUSD * usdJpyRate).toFixed(0);
                 const cryptoHtml = createStockHtml('ビットコイン (JPY)', btcPriceJPY, NaN, NaN);
@@ -354,12 +347,11 @@
                 return;
              }
              
-             // 1. 株と為替を取得
-             await fetchStockAndFXData(); 
+             // 1. 株と為替と商品を取得
+             const container = await fetchStockAndCommodityData(); 
              
              // 2. 仮想通貨を取得（レート制限を考慮し、時間差で実行）
-             await fetchCryptoData();
-
+             if (container) await fetchCryptoData(container);
         })();
     </script>
 </body>
