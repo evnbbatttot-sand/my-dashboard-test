@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（Google版）</title>
+    <title>情報ダッシュボード（Open-Meteo版）</title>
     <style>
+        /* (CSSスタイルは省略しますが、以前のコードと同じです) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -15,7 +16,21 @@
             flex-wrap: wrap;
             gap: 20px;
         }
-        /* ... (その他のCSSは省略しますが、以前のコードと同じです) ... */
+        .header {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 2px solid #333;
+        }
+        #clock {
+            font-size: 3em;
+            font-weight: bold;
+        }
+        #date {
+            font-size: 1.5em;
+            color: #aaa;
+        }
         .info-panel {
             background-color: #2a2a2a;
             border-radius: 10px;
@@ -24,24 +39,33 @@
             flex-grow: 1;
             min-width: 300px;
         }
-        .widget-container {
-            height: 300px; /* ウィジェットの高さを統一 */
-            overflow: hidden;
-            width: 100%;
+        /* Open-Meteoの表示エリア */
+        #weather-data {
+            height: 250px;
+            overflow-y: auto;
+            line-height: 1.6;
+            padding-top: 10px;
         }
-        /* iframeの枠線を消して一体感を出す */
-        .widget-container iframe {
-            border: none;
+        .weather-day {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
         }
-        /* 交通情報用のスタイル */
-        .traffic-widget-container {
+        .weather-day strong {
+            color: #ffcc00; /* 翌日以降の強調 */
+        }
+        /* 交通情報リンクの調整 */
+        .traffic-link-container {
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
             height: 200px;
-            text-align: center;
-            padding-top: 20px;
+            padding: 20px;
+        }
+        .traffic-link-container a {
+            color: #64b5f6;
+            font-size: 1.5em;
+            text-decoration: none;
         }
     </style>
 </head>
@@ -54,55 +78,29 @@
 
     <div class="info-panel" style="flex-basis: 45%;">
         <h2>🌤️ 天気予報（台東区）</h2>
-        <div class="widget-container">
-            <iframe 
-                src="https://www.google.com/search?q=%E6%9D%B1%E4%BA%AC+%E5%8F%B0%E6%9D%B1%E5%8C%BA+%E5%A4%A9%E6%B0%97&hl=ja" 
-                width="100%" 
-                height="300" 
-                frameborder="0" 
-                scrolling="yes" 
-                title="Google 天気予報">
-            </iframe>
+        <div id="weather-data">
+            データを読み込み中です...
         </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
-        <h2>📈 株価情報（例：日経平均）</h2>
-        <div class="widget-container">
-            <iframe 
-                src="https://finance.yahoo.co.jp/search?query=%E6%97%A5%E7%B5%8C%E5%B9%B3%E5%9D%87" 
-                width="100%" 
-                height="300" 
-                frameborder="0" 
-                scrolling="yes" 
-                title="Yahoo!ファイナンス 株価情報">
-            </iframe>
-        </div>
-    </div>
-    
-    <div class="info-panel" style="flex-basis: 100%;">
         <h2>🚃 運行状況（JR山手線）</h2>
-        <div class="traffic-widget-container">
-            <a href="https://ekitan.com/status/" target="_blank" title="駅探 運行情報">
-                <img src="https://static.ekitan.com/status/img/yamanote.gif" alt="JR山手線の運行状況">
-                <p style="font-size: 0.9em; color: #aaa; margin-top: 10px;">
-                    （画像が表示されない場合はリンクをクリックで詳細情報へ）
-                </p>
+        <div class="traffic-link-container">
+            <a href="https://transit.yahoo.co.jp/diainfo/65" target="_blank" title="JR山手線の運行情報">
+                JR山手線 運行情報へ
             </a>
         </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 100%;">
-        <h2>📰 ニュースヘッドライン</h2>
-        <div class="widget-container" style="height: 150px;">
-            <p style="color: #ccc;">
-                （埋め込み制限が厳しいため、ニュースはFire TV Stickでニュースアプリを別途起動するのが最善です）
-            </p>
-        </div>
+        <h2>📰 ニュース・株価情報</h2>
+        <p style="color: #ccc;">
+            （埋め込み制限が厳しいため、Fire TV Stickでニュースアプリをご利用ください。）
+        </p>
     </div>
 
     <script>
-        // ... (時刻更新スクリプトは省略しますが、以前のコードと同じです) ...
+        // 時刻と日付をリアルタイムで更新するスクリプト (変更なし)
         function updateTime() {
             const now = new Date();
             const clock = document.getElementById('clock');
@@ -114,6 +112,63 @@
         }
         setInterval(updateTime, 1000);
         updateTime();
+
+        // Open-Meteoから天気データを取得し表示するスクリプト
+        async function fetchWeatherData() {
+            // 台東区（東京駅付近）の緯度経度
+            const latitude = 35.6895;
+            const longitude = 139.6917;
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                const container = document.getElementById('weather-data');
+                container.innerHTML = ''; // コンテンツをクリア
+
+                if (data.daily && data.daily.time) {
+                    const daysToShow = 3;
+                    let htmlContent = '';
+                    const weatherCodes = {
+                        0: '快晴☀️', 1: '晴れ☀️', 2: '晴れ時々曇り🌤️', 3: '曇り☁️',
+                        45: '霧🌫️', 51: '小雨☔', 61: '雨☔', 71: '小雪❄️', 80: 'にわか雨🌧️',
+                        // その他、必要に応じてコードとアイコンを追加してください
+                    };
+                    
+                    for (let i = 0; i < daysToShow && i < data.daily.time.length; i++) {
+                        const dateStr = data.daily.time[i];
+                        const date = new Date(dateStr);
+                        const dayOfWeek = date.toLocaleDateString('ja-JP', { weekday: 'short' });
+                        const maxTemp = data.daily.temperature_2m_max[i];
+                        const minTemp = data.daily.temperature_2m_min[i];
+                        const weather = weatherCodes[data.daily.weather_code[i]] || '不明';
+
+                        const dayLabel = i === 0 ? '【今日】' : `明日 (${dayOfWeek})`;
+                        
+                        htmlContent += `
+                            <div class="weather-day">
+                                <strong>${dayLabel}:</strong> ${weather}
+                                <br>
+                                ${minTemp}°C / ${maxTemp}°C (最低/最高)
+                            </div>
+                        `;
+                    }
+                    container.innerHTML = htmlContent;
+
+                } else {
+                    container.textContent = '天気データを取得できませんでした。';
+                }
+
+            } catch (error) {
+                console.error('天気データ取得エラー:', error);
+                document.getElementById('weather-data').textContent = '天気データ取得中にエラーが発生しました。';
+            }
+        }
+
+        // ページ読み込み時にデータを取得
+        fetchWeatherData();
+        // 30分ごとに更新（必要に応じて）
+        // setInterval(fetchWeatherData, 30 * 60 * 1000); 
     </script>
 </body>
 </html>
