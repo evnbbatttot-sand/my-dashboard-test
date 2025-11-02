@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（最終版v7: 全機能搭載）</title>
+    <title>情報ダッシュボード（最終版v8: 運行情報リンク・天気修正）</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* (基本スタイルは共通) */
         body {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -46,21 +45,23 @@
             padding-top: 10px;
             position: relative;
         }
-        /* ★修正: グラフ下の天気アイコン表示エリア */
+        /* ★再修正: グラフ下の天気アイコン表示エリア */
         #weather-icons {
             display: flex;
-            justify-content: space-between; 
-            /* グラフ描画エリアの端に近くなるようパディングを調整 */
-            padding: 5px 15px 0 15px; 
+            justify-content: space-around; /* アイコンを均等配置 */
+            padding: 5px 0 0 0; /* 左右のパディングをなくす */
             margin-top: -20px; 
             font-size: 1.5em;
             position: relative;
             z-index: 10;
+            width: calc(100% - 70px); /* グラフ描画エリアの幅に合わせて調整 */
+            margin-left: 45px; /* 左側のY軸ラベルの幅に合わせて調整 */
         }
         .weather-icon-day {
             text-align: center;
             flex: 1;
             max-width: 14.28%; /* 7日分で均等幅 */
+            margin-left: -5px; /* 微調整 */
         }
         /* --- 株価情報のスタイル --- */
         #stock-data { padding-top: 10px; height: 350px; overflow-y: auto; }
@@ -73,9 +74,24 @@
         .arrow-up { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 8px solid #4CAF50; margin-right: 3px; }
         .arrow-down { display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #F44336; margin-right: 3px; }
         .arrow-neutral { display: inline-block; font-weight: bold; margin-right: 3px; }
-        /* 交通情報リンクの調整 */
-        .traffic-link-container { display: flex; align-items: center; justify-content: center; height: 200px; padding: 20px; }
-        .traffic-link-container a { color: #64b5f6; font-size: 1.5em; text-decoration: none; }
+        /* --- 交通情報リンクの調整 --- */
+        .traffic-link-container {
+            display: flex;
+            flex-direction: column; /* リンクを縦に並べる */
+            align-items: flex-start; /* 左寄せ */
+            justify-content: center;
+            height: 200px;
+            padding: 20px;
+        }
+        .traffic-link-container a {
+            color: #64b5f6;
+            font-size: 1.2em; /* 文字サイズを少し小さく */
+            text-decoration: none;
+            margin-bottom: 10px; /* リンク間の余白 */
+        }
+        .traffic-link-container a:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -90,7 +106,7 @@
         <div id="weather-chart-container">
             <canvas id="weatherChart"></canvas>
             <div id="weather-icons"></div>
-            </div>
+        </div>
     </div>
 
     <div class="info-panel" style="flex-basis: 45%;">
@@ -102,10 +118,19 @@
     </div>
 
     <div class="info-panel" style="flex-basis: 100%;">
-        <h2>🚃 運行状況（JR山手線）</h2>
+        <h2>🚃 運行状況</h2>
         <div class="traffic-link-container">
-            <a href="https://transit.yahoo.co.jp/diainfo/65" target="_blank" title="JR山手線の運行情報">
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=yamanoteline" target="_blank" title="JR山手線の運行情報">
                 JR山手線 運行情報へ
+            </a>
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=sobuline_rapidservice" target="_blank" title="JR総武快速線の運行情報">
+                JR総武快速線 運行情報へ
+            </a>
+            <a href="https://traininfo.jreast.co.jp/train_info/line.aspx?gid=1&lineid=sobuline_local" target="_blank" title="JR中央・総武各駅停車の運行情報">
+                JR中央・総武各駅停車 運行情報へ
+            </a>
+            <a href="https://www.kotsu.metro.tokyo.jp/subway/schedule/" target="_blank" title="都営浅草線の運行情報">
+                都営浅草線 運行情報へ
             </a>
         </div>
     </div>
@@ -144,7 +169,6 @@
                 const data = await response.json();
                 
                 if (data.daily && data.daily.time) {
-                    // ラベルを「日付(曜日)」に変更
                     const labels = data.daily.time.map(dateStr => {
                         const date = new Date(dateStr);
                         const day = date.getDate();
@@ -157,7 +181,6 @@
                     const precipitations = data.daily.precipitation_probability_max;
                     const weatherCodesDaily = data.daily.weather_code;
 
-                    // グラフ下のアイコン表示
                     let iconHtml = '';
                     for (let i = 0; i < labels.length; i++) {
                         const icon = weatherCodes[weatherCodesDaily[i]] ? weatherCodes[weatherCodesDaily[i]].icon : '？';
@@ -165,194 +188,4 @@
                     }
                     document.getElementById('weather-icons').innerHTML = iconHtml;
 
-                    // Chart.jsでグラフ描画
-                    const ctx = document.getElementById('weatherChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: '最高気温 (°C)', data: maxTemps, borderColor: 'rgb(255, 99, 132)', backgroundColor: 'rgba(255, 99, 132, 0.2)', yAxisID: 'temp', tension: 0.4
-                            }, {
-                                label: '最低気温 (°C)', data: minTemps, borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.2)', yAxisID: 'temp', tension: 0.4
-                            }, {
-                                type: 'bar', label: '降水確率 (%)', data: precipitations, backgroundColor: 'rgba(75, 192, 192, 0.5)', yAxisID: 'precip',
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            scales: {
-                                temp: { type: 'linear', position: 'left', title: { display: true, text: '気温 (°C)' }, grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
-                                x: { grid: { color: '#333' }, ticks: { color: '#f0f0f0' } },
-                                precip: { type: 'linear', position: 'right', max: 100, title: { display: true, text: '降水確率 (%)' }, grid: { drawOnChartArea: false, color: '#333' }, ticks: { color: '#f0f0f0' } }
-                            },
-                            plugins: { legend: { labels: { color: '#f0f0f0' } } }
-                        }
-                    });
-
-                } else {
-                    document.getElementById('weatherChart').textContent = '天気データを取得できませんでした。';
-                }
-            } catch (error) {
-                document.getElementById('weather-chart-container').innerHTML = '天気データ取得中にエラーが発生しました。';
-            }
-        }
-        fetchWeatherData();
-
-        // --- 3. 株価情報のスクリプト (項目追加) ---
-        
-        // 補助関数: 表示HTMLの生成 (変更なし)
-        function createStockHtml(name, price, change, changePercent) {
-            let changeClass = 'change-neutral';
-            let arrow = '<span class="arrow-neutral">ー</span>';
-            const isChange = !isNaN(change);
-
-            if (isChange && change > 0) {
-                changeClass = 'change-positive';
-                arrow = '<span class="arrow-up"></span>';
-            } else if (isChange && change < 0) {
-                changeClass = 'change-negative';
-                arrow = '<span class="arrow-down"></span>';
-            }
-            
-            const sign = isChange && change >= 0 ? '+' : '';
-            const displayChange = isChange ? `${sign}${change}` : 'N/A';
-            const displayPercent = isChange ? `(${sign}${changePercent}%)` : '';
-
-            return `
-                <div class="stock-item">
-                    <span class="stock-name">${name}</span>
-                    <div class="stock-value-container">
-                        <span class="stock-price">${price}</span>
-                        <span class="stock-change ${changeClass}">
-                            ${arrow} ${displayChange} ${displayPercent}
-                        </span>
-                    </div>
-                </div>
-            `;
-        }
-
-        // 株価/為替/商品を取得する
-        async function fetchStockAndCommodityData() {
-            // ★追加: GOLD (金)とWTI (原油)を追加
-            const symbols = [
-                { symbol: 'NKY', name: '日経平均', type: 'stock' },     
-                { symbol: 'MSFT', name: 'NASDAQ（代替）', type: 'stock' },
-                { symbol: 'USDJPY', name: 'USD/JPY', type: 'fx' },     
-                { symbol: 'EURJPY', name: 'EUR/JPY', type: 'fx' },     
-                { symbol: 'GOLD', name: '金 (USD)', type: 'commodity' }, // GOLD
-                { symbol: 'WTI', name: '原油 (USD)', type: 'commodity' }, // Crude Oil
-            ];
-
-            const container = document.getElementById('stock-data');
-            let htmlContent = '';
-            
-            if (API_KEY === 'YOUR_API_KEY') return;
-
-            for (const item of symbols) {
-                let url;
-                let pricePrecision = (item.symbol === 'GOLD' || item.symbol === 'WTI') ? 2 : 2; // 商品も2桁に設定
-
-                if (item.type === 'fx') {
-                    const fromCurrency = item.symbol.substring(0, 3);
-                    const toCurrency = item.symbol.substring(3, 6);
-                    url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${API_KEY}`;
-                } else {
-                    // 株/指数/商品
-                    url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${item.symbol}&apikey=${API_KEY}`;
-                }
-
-                try {
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    
-                    let price, change, changePercent;
-                    
-                    if (data['Realtime Currency Exchange Rate']) {
-                        // 為替の場合
-                        const rate = data['Realtime Currency Exchange Rate'];
-                        price = parseFloat(rate['5. Exchange Rate']).toFixed(2);
-                        change = NaN; changePercent = NaN;
-                    } else if (data['Global Quote']) {
-                        // 株/指数/商品の場合
-                        const quote = data['Global Quote'];
-                        price = parseFloat(quote['05. price']).toFixed(pricePrecision);
-                        change = parseFloat(quote['09. change']).toFixed(pricePrecision);
-                        changePercent = parseFloat(quote['10. change percent']).toFixed(2).replace('%', '');
-                    } else {
-                        htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">データ取得不可</span></div>`;
-                        await new Promise(resolve => setTimeout(resolve, 13000));
-                        continue;
-                    }
-
-                    htmlContent += createStockHtml(item.name, price, change, changePercent);
-
-                } catch (error) {
-                    htmlContent += `<div class="stock-item"><span class="stock-name">${item.name}</span><span style="color: #f44336;">エラー</span></div>`;
-                }
-                await new Promise(resolve => setTimeout(resolve, 13000)); // APIレート制限対策
-            }
-            // 既存のコンテンツを初期化し、株と為替と商品を追加
-            document.getElementById('stock-data').innerHTML = htmlContent;
-            return document.getElementById('stock-data');
-        }
-
-
-        // 仮想通貨 (Crypto) を取得する (BTC/JPYに変換)
-        async function fetchCryptoData(container) {
-            if (API_KEY === 'YOUR_API_KEY') return;
-
-            const cryptoSymbol = 'BTC';
-            const marketSymbol = 'USD';
-            
-            const cryptoUrl = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${cryptoSymbol}&to_currency=${marketSymbol}&apikey=${API_KEY}`;
-            const fxUrl = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=USD&to_currency=JPY&apikey=${API_KEY}`;
-            
-            let btcPriceUSD, usdJpyRate;
-
-            try {
-                const cryptoRes = await fetch(cryptoUrl);
-                const cryptoData = await cryptoRes.json();
-                btcPriceUSD = parseFloat(cryptoData['Realtime Currency Exchange Rate']['5. Exchange Rate']);
-            } catch (e) { btcPriceUSD = null; }
-
-            await new Promise(resolve => setTimeout(resolve, 13000));
-
-            try {
-                const fxRes = await fetch(fxUrl);
-                const fxData = await fxRes.json();
-                usdJpyRate = parseFloat(fxData['Realtime Currency Exchange Rate']['5. Exchange Rate']);
-            } catch (e) { usdJpyRate = null; }
-
-            if (btcPriceUSD && usdJpyRate) {
-                const btcPriceJPY = (btcPriceUSD * usdJpyRate).toFixed(0);
-                const cryptoHtml = createStockHtml('ビットコイン (JPY)', btcPriceJPY, NaN, NaN);
-                
-                // 既存のHTMLに追加
-                container.innerHTML += cryptoHtml;
-            } else {
-                container.innerHTML += `<div class="stock-item"><span class="stock-name">ビットコイン (JPY)</span><span style="color: #f44336;">データ取得不可</span></div>`;
-            }
-
-            container.innerHTML += `<p style="font-size: 0.8em; color: #aaa; margin-top: 10px;">
-                ※データは遅延または市場営業時間外のものです。<br>
-                ※APIレート制限のため表示に時間がかかる場合があります。
-            </p>`;
-        }
-
-        // すべてのデータを順次取得開始
-        (async () => {
-             if (API_KEY === 'YOUR_API_KEY') {
-                document.getElementById('stock-data').innerHTML = '⚠️ **APIキーが未設定です。**<br>Alpha Vantageでキーを取得し、コードを修正してください。';
-                return;
-             }
-             
-             // 1. 株と為替と商品を取得
-             const container = await fetchStockAndCommodityData(); 
-             
-             // 2. 仮想通貨を取得（レート制限を考慮し、時間差で実行）
-             if (container) await fetchCryptoData(container);
-        })();
-    </script>
-</body>
-</html>
+                    const
