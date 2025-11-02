@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>情報ダッシュボード（v12: ニュースと防災を追加）</title>
+    <title>情報ダッシュボード（v13: ニュース分野変更 & 防災エラー修正）</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
 <style>
@@ -36,7 +36,6 @@
         }
         .info-panel.large { flex-basis: 45%; }
         .info-panel.full-width { flex-basis: 100%; }
-        /* 新規パネルのベース設定 */
         .info-panel.half-width { flex-basis: calc(50% - 30px); } 
 
         .info-panel h2 {
@@ -70,7 +69,7 @@
         .traffic-link-container { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; height: 200px; padding: 20px; }
         .traffic-link-container a { color: #64b5f6; font-size: 1.2em; text-decoration: none; margin-bottom: 10px; }
 
-        /* --- 新規: ニュースヘッドラインのスタイル --- */
+        /* --- ニュースヘッドラインのスタイル --- */
         #news-list { padding-top: 5px; height: 280px; overflow-y: auto; }
         #news-list ul { list-style: none; padding: 0; margin: 0; }
         #news-list li { margin-bottom: 10px; border-bottom: 1px dotted #444; padding-bottom: 5px; }
@@ -78,11 +77,9 @@
         #news-list a:hover { color: #ffeb3b; }
         .news-date { display: block; font-size: 0.8em; color: #aaa; margin-top: 2px; }
         
-        /* --- 新規: 防災・警報のスタイル --- */
+        /* --- 防災・警報のスタイル --- */
         #alert-info { padding-top: 5px; min-height: 280px; }
-        /* 警報 */
         .alert-item { background-color: #4a1c1c; border: 2px solid #f44336; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
-        /* 注意報 */
         .warning-item { background-color: #4a3e1c; border: 2px solid #ff9800; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
         .no-alert { color: #4CAF50; font-size: 1.2em; font-weight: bold; text-align: center; padding-top: 20px;}
         .alert-title { font-size: 1.2em; font-weight: bold; color: #ffeb3b; margin-bottom: 5px; }
@@ -131,7 +128,7 @@
     </div>
 
     <div class="info-panel half-width">
-        <h2>📰 ニュースヘッドライン (NHK)</h2>
+        <h2>📰 ニュースヘッドライン (NHK 政治・経済)</h2>
         <div id="news-list">
             ニュースを読み込み中...
         </div>
@@ -255,7 +252,7 @@
             }
             
             const sign = isChange && change >= 0 ? '+' : '';
-            const displayChange = isChange ? `${sign}${change}` : 'N/A';
+            const displayChange = isChange ? `${change}` : 'N/A';
             const displayPercent = isChange ? `(${sign}${changePercent}%)` : '';
             
             const arrowElement = (change > 0) ? '<span class="arrow-up"></span>' : 
@@ -268,7 +265,7 @@
                     <div class="stock-value-container">
                         <span class="stock-price">${price}</span>
                         <span class="stock-change ${changeClass}">
-                            ${arrowElement} ${displayChange} ${displayPercent}
+                            ${arrowElement} ${sign}${displayChange} ${displayPercent}
                         </span>
                     </div>
                 </div>
@@ -380,8 +377,8 @@
 
         // --- 4. 新規: ニュースヘッドラインの取得 (RSS2JSONプロキシ利用) ---
         async function fetchNewsHeadlines() {
-            // NHK NEWS WEB トップニュースのRSSフィードURL
-            const rssUrl = 'https://www.nhk.or.jp/rss/news/cat0.xml'; 
+            // ★変更: NHK NEWS WEB トップニュース -> 政治・経済のRSSフィードURLに変更
+            const rssUrl = 'https://www.nhk.or.jp/rss/news/cat2.xml'; 
             // CORS回避のための公開プロキシサービスを利用 (外部サービスへの依存に注意)
             const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
             const newsListDiv = document.getElementById('news-list');
@@ -425,9 +422,11 @@
                 const data = await response.json();
                 
                 let alertHtml = '';
-                const warnings = data.city.warnings; 
-
-                if (warnings && warnings.length > 0) {
+                
+                // ★修正: data.city が存在し、warnings が配列で要素を持つかを確認
+                if (data.city && Array.isArray(data.city.warnings) && data.city.warnings.length > 0) {
+                    const warnings = data.city.warnings; 
+                    
                     warnings.forEach(warning => {
                         // 警報は赤、注意報はオレンジとして表示を分ける
                         const isWarning = warning.title.includes('警報');
@@ -447,7 +446,7 @@
                     if (alertInfoDiv) alertInfoDiv.innerHTML = alertHtml;
 
                 } else {
-                    // 警報・注意報がない場合、シンプルなメッセージを表示
+                    // 警報・注意報がない場合、またはデータ構造が不正な場合
                     if (alertInfoDiv) alertInfoDiv.innerHTML = '<div class="no-alert">✅ 現在、警報・注意報はありません。</div>';
                 }
             } catch (error) {
