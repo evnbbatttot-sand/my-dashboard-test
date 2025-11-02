@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>朝の情報ダッシュボード（台東区）</title>
+    <style>
+        /* 全体の設定：背景を暗く、文字を明るくしてテレビでの視認性を高める */
+        body {
+            background-color: #1a1a1a; /* ダークグレー */
+            color: #f0f0f0; /* オフホワイト */
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap; /* 要素の折り返しを許可 */
+            gap: 20px; /* 要素間のスペース */
+        }
+        /* 時計と日付のスタイル */
+        .header {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 2px solid #333;
+        }
+        #clock {
+            font-size: 3em;
+            font-weight: bold;
+        }
+        #date {
+            font-size: 1.5em;
+            color: #aaa;
+        }
+
+        /* 各情報パネルの基本スタイル */
+        .info-panel {
+            background-color: #2a2a2a; /* やや明るいグレー */
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            flex-grow: 1; /* 均等にスペースを使う */
+            min-width: 300px; /* 最小幅 */
+        }
+        .info-panel h2 {
+            margin-top: 0;
+            color: #64b5f6; /* 青系のアクセントカラー */
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        /* ウィジェットの埋め込み用コンテナのスタイル */
+        .widget-container {
+            /* 埋め込む外部ウィジェットのサイズに合わせて調整してください */
+            height: 300px; /* 例として高さを指定 */
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* AccuWeather ウィジェットを格納するコンテナ */
+        #accuweather_widget {
+            height: 300px; /* ウィジェットの高さに合わせる */
+            padding-top: 20px; /* 上部に余白を設けて見やすくする */
+        }
+
+        /* 交通情報: 埋め込みがブロックされる可能性があるため、代替テキストを表示 */
+        #traffic_widget {
+            padding: 20px;
+            font-size: 1.1em;
+            color: #ccc;
+        }
+        #traffic_widget a {
+            color: #64b5f6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div id="clock">00:00:00</div>
+        <div id="date">YYYY年MM月DD日 (曜日)</div>
+    </div>
+
+    <div class="info-panel" style="flex-basis: 45%;">
+        <h2>🌤️ 天気予報（台東区）</h2>
+        <div id="accuweather_widget">
+            <a class="aw-widget-legal">
+            </a>
+            <div id="awcc1445738814514" class="aw-widget-current" data-locationkey="226396" data-unit="c" data-language="ja" data-useip="false" data-countrycode="JP" data-metric="true" data-size="l" data-label_bg="true"></div>
+            <script type="text/javascript" src="https://oap.accuweather.com/launch.js"></script>
+        </div>
+    </div>
+
+    <div class="info-panel" style="flex-basis: 45%;">
+        <h2>🚃 交通情報（JR山手線）</h2>
+        <div id="traffic_widget">
+            <p>ウィジェットの埋め込みが制限されています。</p>
+            <p>以下のリンクをクリックして最新情報を確認してください。</p>
+            <p><a href="https://transit.yahoo.co.jp/diainfo/65" target="_blank">→ JR山手線の運行情報へ</a></p>
+            <p style="margin-top: 15px; font-size: 0.9em; color: #888;">（Fire TV Stickでこのページを表示している場合、リンクをクリックするとブラウザで情報が開きます）</p>
+        </div>
+    </div>
+    
+    <div class="info-panel" style="flex-basis: 100%;">
+        <h2>📰 ニュースヘッドライン</h2>
+        <p>（ここに、お好みのニュースRSSリーダーや、他の情報ウィジェットを埋め込んでカスタマイズしてください。）</p>
+    </div>
+
+    <script>
+        // 時刻と日付をリアルタイムで更新するスクリプト
+        function updateTime() {
+            const now = new Date();
+            const clock = document.getElementById('clock');
+            const date = document.getElementById('date');
+
+            // 時刻のフォーマット
+            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            clock.textContent = now.toLocaleTimeString('ja-JP', timeOptions);
+
+            // 日付のフォーマット
+            const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            date.textContent = now.toLocaleDateString('ja-JP', dateOptions);
+        }
+
+        // 1秒ごとに更新
+        setInterval(updateTime, 1000);
+        updateTime(); // 初回実行
+    </script>
+</body>
+</html>
